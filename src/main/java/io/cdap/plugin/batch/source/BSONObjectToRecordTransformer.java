@@ -120,6 +120,7 @@ public class BSONObjectToRecordTransformer {
           ByteBuffer buffer = ByteBuffer.allocate(12);
           ObjectId objectId = (ObjectId) object;
           objectId.putToByteBuffer(buffer);
+          buffer.rewind();
           return buffer;
         }
         return object;

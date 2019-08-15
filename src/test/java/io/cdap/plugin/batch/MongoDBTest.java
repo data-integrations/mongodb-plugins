@@ -19,7 +19,6 @@ package io.cdap.plugin.batch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -78,7 +77,6 @@ import org.bson.BsonNull;
 import org.bson.BsonObjectId;
 import org.bson.BsonString;
 import org.bson.BsonValue;
-import org.bson.Document;
 import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
 import org.junit.After;
@@ -87,12 +85,18 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.math.BigDecimal;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -112,45 +116,20 @@ public class MongoDBTest extends HydratorTestBase {
                                                                               CURRENT_VERSION, true);
 
   private static final String MONGO_DB = "cdap";
-  private static final String MONGO_SOURCE_COLLECTIONS = "stocks";
   private static final String MONGO_SINK_COLLECTIONS = "copy";
-  private static final String MONGO_SUPPORTED_DATA_TYPES_COLLECTIONS = "alltypes";
+  private static final String SOURCE_COLLECTIONS = "source";
 
-  private static final Schema SINK_BODY_SCHEMA = Schema.recordOf(
-    "event",
-    Schema.Field.of("ticker", Schema.of(Schema.Type.STRING)),
-    Schema.Field.of("num", Schema.of(Schema.Type.INT)),
-    Schema.Field.of("price", Schema.of(Schema.Type.DOUBLE)));
-
-  private static final Schema SOURCE_BODY_SCHEMA = Schema.recordOf(
-    "event",
-    Schema.Field.of("ticker", Schema.of(Schema.Type.STRING)),
-    Schema.Field.of("num", Schema.of(Schema.Type.INT)),
-    Schema.Field.of("price", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
-    Schema.Field.of("agents", Schema.nullableOf(Schema.arrayOf(Schema.nullableOf(Schema.of(Schema.Type.STRING))))));
-
-  private static final List<BsonDocument> TEST_DOCUMENTS = Arrays.asList(
-    new BsonDocument()
-      .append("ticker", new BsonString("AAPL"))
-      .append("num", new BsonInt32(10))
-      .append("price", new BsonDouble(23.23))
-      .append("agents", new BsonArray(Arrays.asList(new BsonString("a1"), new BsonString("a2")))),
-
-    new BsonDocument()
-      .append("ticker", new BsonString("ORCL"))
-      .append("num", new BsonInt32(12))
-      .append("price", new BsonDouble(10.10))
-      .append("agents", new BsonArray(Arrays.asList(new BsonString("a1"), new BsonString("a2"))))
-  );
-
-  private static final Schema SUPPORTED_DATA_TYPES_SCHEMA = Schema.recordOf(
+  private static final ZonedDateTime DATE_TIME = ZonedDateTime.now(ZoneOffset.UTC);
+  private static final Schema NESTED_SCHEMA = Schema.recordOf("", Schema.Field.of("inner_field",
+                                                                                  Schema.of(Schema.Type.STRING)));
+  private static final Schema SCHEMA = Schema.recordOf(
     "document",
     Schema.Field.of("_id", Schema.of(Schema.Type.STRING)),
     Schema.Field.of("string", Schema.of(Schema.Type.STRING)),
     Schema.Field.of("int32", Schema.of(Schema.Type.INT)),
     Schema.Field.of("double", Schema.of(Schema.Type.DOUBLE)),
-    Schema.Field.of("array",  Schema.arrayOf(Schema.nullableOf(Schema.of(Schema.Type.STRING)))),
-    Schema.Field.of("object", Schema.recordOf("", Schema.Field.of("inner_field", Schema.of(Schema.Type.STRING)))),
+    Schema.Field.of("array", Schema.arrayOf(Schema.nullableOf(Schema.of(Schema.Type.STRING)))),
+    Schema.Field.of("object", NESTED_SCHEMA),
     Schema.Field.of("object-to-map", Schema.mapOf(Schema.of(Schema.Type.STRING), Schema.of(Schema.Type.STRING))),
     Schema.Field.of("binary", Schema.of(Schema.Type.BYTES)),
     Schema.Field.of("boolean", Schema.of(Schema.Type.BOOLEAN)),
@@ -160,7 +139,40 @@ public class MongoDBTest extends HydratorTestBase {
     Schema.Field.of("decimal", Schema.decimalOf(20, 10))
   );
 
-  private static final List<BsonDocument> SUPPORTED_DATA_TYPES_TEST_DOCUMENTS = Arrays.asList(
+  private static final List<StructuredRecord> TEST_RECORDS = Arrays.asList(
+    StructuredRecord.builder(SCHEMA)
+      .set("_id", "5d079ee6d078c94008e4bb3a")
+      .set("string", "AAPL")
+      .set("int32", Integer.MIN_VALUE)
+      .set("double", Double.MIN_VALUE)
+      .set("array", Arrays.asList("a1", "a2"))
+      .set("object", StructuredRecord.builder(NESTED_SCHEMA).set("inner_field", "val").build())
+      .set("object-to-map", ImmutableMap.builder().put("key", "value").build())
+      .set("binary", "binary data".getBytes())
+      .set("boolean", false)
+      .setTimestamp("date", DATE_TIME)
+      .set("long", Long.MIN_VALUE)
+      .setDecimal("decimal", new BigDecimal("987654321.1234567890"))
+      .build(),
+
+    StructuredRecord.builder(SCHEMA)
+      .set("_id", "5d079ee6d078c94008e4bb37")
+      .set("string", "AAPL")
+      .set("int32", 10)
+      .set("double", 23.23)
+      .set("array", Arrays.asList("a1", "a2"))
+      .set("object", StructuredRecord.builder(NESTED_SCHEMA).set("inner_field", "val").build())
+      .set("object-to-map", ImmutableMap.builder().put("key", "value").build())
+      .set("binary", "binary data".getBytes())
+      .set("boolean", false)
+      .setTimestamp("date", DATE_TIME)
+      .set("long", Long.MAX_VALUE)
+      .setDecimal("decimal", new BigDecimal("0.1234567890"))
+      .build()
+  );
+
+  // Correspond to the TEST_RECORDS
+  private static final List<BsonDocument> TEST_DOCUMENTS = Arrays.asList(
     new BsonDocument()
       .append("_id", new BsonObjectId(new ObjectId("5d079ee6d078c94008e4bb3a")))
       .append("string", new BsonString("AAPL"))
@@ -171,13 +183,13 @@ public class MongoDBTest extends HydratorTestBase {
       .append("object-to-map", new BsonDocument().append("key", new BsonString("value")))
       .append("binary", new BsonBinary("binary data".getBytes()))
       .append("boolean", new BsonBoolean(false))
-      .append("date", new BsonDateTime(System.currentTimeMillis()))
+      .append("date", new BsonDateTime(DATE_TIME.toInstant().toEpochMilli()))
       .append("null", new BsonNull())
       .append("long", new BsonInt64(Long.MIN_VALUE))
       .append("decimal", new BsonDecimal128(Decimal128.parse("987654321.1234567890"))),
 
     new BsonDocument()
-      .append("_id", new BsonObjectId())
+      .append("_id", new BsonObjectId(new ObjectId("5d079ee6d078c94008e4bb37")))
       .append("string", new BsonString("AAPL"))
       .append("int32", new BsonInt32(10))
       .append("double", new BsonDouble(23.23))
@@ -186,11 +198,112 @@ public class MongoDBTest extends HydratorTestBase {
       .append("object-to-map", new BsonDocument().append("key", new BsonString("value")))
       .append("binary", new BsonBinary("binary data".getBytes()))
       .append("boolean", new BsonBoolean(false))
-      .append("date", new BsonDateTime(System.currentTimeMillis()))
+      .append("date", new BsonDateTime(DATE_TIME.toInstant().toEpochMilli()))
       .append("null", new BsonNull())
       .append("long", new BsonInt64(Long.MAX_VALUE))
       .append("decimal", new BsonDecimal128(Decimal128.parse("0.1234567890")))
-    );
+  );
+
+  private static final Schema ALL_SINK_DATATYPES_SCHEMA = Schema.recordOf(
+    "document",
+    ImmutableList.<Schema.Field>builder()
+      .addAll(SCHEMA.getFields())
+      .addAll(Arrays.asList(
+        Schema.Field.of("date-field", Schema.of(Schema.LogicalType.DATE)),
+        Schema.Field.of("float", Schema.of(Schema.Type.FLOAT)),
+        Schema.Field.of("time", Schema.of(Schema.LogicalType.TIME_MILLIS)),
+        Schema.Field.of("enum", Schema.enumWith("first", "second")),
+        Schema.Field.of("union", Schema.unionOf(Schema.of(Schema.Type.STRING), NESTED_SCHEMA))
+      )).build()
+  );
+
+  private static final List<StructuredRecord> ALL_SINK_DATATYPES_RECORDS = Arrays.asList(
+    StructuredRecord.builder(ALL_SINK_DATATYPES_SCHEMA)
+      .set("_id", "5d079ee6d078c94008e4bb4a")
+      .set("string", "AAPL")
+      .set("int32", Integer.MIN_VALUE)
+      .set("double", Double.MIN_VALUE)
+      .set("array", Arrays.asList("a1", "a2"))
+      .set("object", StructuredRecord.builder(NESTED_SCHEMA).set("inner_field", "val").build())
+      .set("object-to-map", ImmutableMap.builder().put("key", "value").build())
+      .set("binary", "binary data".getBytes())
+      .set("boolean", false)
+      .setTimestamp("date", DATE_TIME)
+      .set("long", Long.MIN_VALUE)
+      .setDecimal("decimal", new BigDecimal("987654321.1234567890"))
+      .setDate("date-field", DATE_TIME.toLocalDate())
+      .set("float", Float.MIN_VALUE)
+      .setTime("time", DATE_TIME.toLocalTime())
+      .set("enum", "first")
+      .set("union", StructuredRecord.builder(NESTED_SCHEMA).set("inner_field", "val").build())
+      .build(),
+
+    StructuredRecord.builder(ALL_SINK_DATATYPES_SCHEMA)
+      .set("_id", "5d079ee6d078c94008e4bb47")
+      .set("string", "AAPL")
+      .set("int32", 10)
+      .set("double", 23.23)
+      .set("array", Arrays.asList("a1", "a2"))
+      .set("object", StructuredRecord.builder(NESTED_SCHEMA).set("inner_field", "val").build())
+      .set("object-to-map", ImmutableMap.builder().put("key", "value").build())
+      .set("binary", "binary data".getBytes())
+      .set("boolean", false)
+      .setTimestamp("date", DATE_TIME)
+      .set("long", Long.MAX_VALUE)
+      .setDecimal("decimal", new BigDecimal("0.1234567890"))
+      .setDate("date-field", DATE_TIME.toLocalDate())
+      .set("float", Float.MIN_VALUE)
+      .setTime("time", DATE_TIME.toLocalTime())
+      .set("enum", "second")
+      .set("union", "string")
+      .build()
+  );
+
+  private static final BiConsumer<StructuredRecord, BsonDocument> COMPARE_COMMON = (expected, actual) -> {
+    Assert.assertEquals(expected.get("string"), actual.getString("string").getValue());
+    Assert.assertEquals((int) expected.get("int32"), actual.getInt32("int32").getValue());
+    Assert.assertEquals(expected.<Double>get("double"), actual.getDouble("double").getValue(), 0.00001);
+    Assert.assertArrayEquals(expected.get("binary"), actual.getBinary("binary").getData());
+    Assert.assertEquals((long) expected.get("long"), actual.getInt64("long").getValue());
+    Assert.assertEquals(expected.get("boolean"), actual.getBoolean("boolean").getValue());
+
+    Assert.assertEquals(expected.get("array"),
+                        actual.getArray("array").getValues().stream()
+                          .map(BsonValue::asString)
+                          .map(BsonString::getValue)
+                          .collect(Collectors.toList()));
+
+    Assert.assertEquals(expected.<StructuredRecord>get("object").get("inner_field"),
+                        actual.getDocument("object").getString("inner_field").getValue());
+
+    Map<String, String> actualMap = actual.getDocument("object-to-map").entrySet().stream()
+      .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().asString().getValue()));
+
+    Assert.assertEquals(expected.get("object-to-map"), actualMap);
+
+    Assert.assertEquals(expected.getTimestamp("date").toInstant().toEpochMilli(),
+                        actual.getDateTime("date").getValue());
+
+    Assert.assertEquals(expected.getDecimal("decimal"),
+                        actual.getDecimal128("decimal").getValue().bigDecimalValue());
+  };
+
+  private static final BiConsumer<StructuredRecord, BsonDocument> COMPARE_SINK_DATA_TYPES = (expected, actual) -> {
+    Assert.assertEquals(expected.getDate("date-field").atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+                        actual.getDateTime("date-field").getValue());
+    Assert.assertEquals(expected.<Float>get("float"), actual.getDouble("float").getValue(), 0.00001);
+    Assert.assertEquals(expected.get("enum"), actual.getString("enum").getValue());
+    Assert.assertEquals(expected.getTime("time").toString(), actual.getString("time").getValue());
+    // If actual value is a record
+    if (expected.get("union") instanceof StructuredRecord) {
+      Assert.assertEquals(expected.<StructuredRecord>get("union").get("inner_field"),
+                          actual.getDocument("union").getString("inner_field").getValue());
+    }
+    // If actual value is a string
+    if (expected.get("union") instanceof String) {
+      Assert.assertEquals(expected.get("union"), actual.getString("union").getValue());
+    }
+  };
 
   private static final MongodStarter starter = MongodStarter.getDefaultInstance();
   private MongodExecutable mongodExecutable;
@@ -225,16 +338,11 @@ public class MongoDBTest extends HydratorTestBase {
     MongoDatabase mongoDatabase = mongoClient.getDatabase(MONGO_DB);
     MongoIterable<String> collections = mongoDatabase.listCollectionNames();
     Assert.assertFalse(collections.iterator().hasNext());
-    mongoDatabase.createCollection(MONGO_SOURCE_COLLECTIONS);
     MongoDatabase db = mongoClient.getDatabase(MONGO_DB);
-    MongoCollection dbCollection = db.getCollection(MONGO_SOURCE_COLLECTIONS, BsonDocument.class);
-    dbCollection.insertMany(TEST_DOCUMENTS);
 
-    // Prepare supported data types
-    mongoDatabase.createCollection(MONGO_SUPPORTED_DATA_TYPES_COLLECTIONS);
-    MongoCollection allDataTypesCollection = db.getCollection(MONGO_SUPPORTED_DATA_TYPES_COLLECTIONS,
-                                                              BsonDocument.class);
-    allDataTypesCollection.insertMany(SUPPORTED_DATA_TYPES_TEST_DOCUMENTS);
+    mongoDatabase.createCollection(SOURCE_COLLECTIONS);
+    MongoCollection allDataTypesCollection = db.getCollection(SOURCE_COLLECTIONS, BsonDocument.class);
+    allDataTypesCollection.insertMany(TEST_DOCUMENTS);
   }
 
   @After
@@ -257,18 +365,18 @@ public class MongoDBTest extends HydratorTestBase {
       "MongoDB",
       BatchSink.PLUGIN_TYPE,
       new ImmutableMap.Builder<String, String>()
-        .put(MongoDBBatchSink.Properties.CONNECTION_STRING,
-             String.format("mongodb://localhost:%d/%s.%s",
-                           mongoPort, MONGO_DB, MONGO_SINK_COLLECTIONS))
+        .putAll(getCommonPluginProperties())
+        .put(MongoDBConstants.ID_FIELD, "_id")
+        .put(MongoDBConstants.COLLECTION, MONGO_SINK_COLLECTIONS)
         .put(Constants.Reference.REFERENCE_NAME, "MongoTestDBSink1").build(),
       null));
     ETLStage sink2 = new ETLStage("MongoDB2", new ETLPlugin(
       "MongoDB",
       BatchSink.PLUGIN_TYPE,
       new ImmutableMap.Builder<String, String>()
-        .put(MongoDBBatchSink.Properties.CONNECTION_STRING,
-             String.format("mongodb://localhost:%d/%s.%s",
-                           mongoPort, MONGO_DB, secondCollectionName))
+        .putAll(getCommonPluginProperties())
+        .put(MongoDBConstants.ID_FIELD, "_id")
+        .put(MongoDBConstants.COLLECTION, secondCollectionName)
         .put(Constants.Reference.REFERENCE_NAME, "MongoTestDBSink2").build(),
       null));
     ETLBatchConfig etlConfig = ETLBatchConfig.builder("* * * * *")
@@ -282,19 +390,18 @@ public class MongoDBTest extends HydratorTestBase {
     ApplicationId appId = NamespaceId.DEFAULT.app("MongoSinkTest");
     ApplicationManager appManager = deployApplication(appId, appRequest);
 
-    List<StructuredRecord> inputRecords = ImmutableList.of(
-      StructuredRecord.builder(SINK_BODY_SCHEMA).set("ticker", "AAPL").set("num", 10).set("price", 500.32).build(),
-      StructuredRecord.builder(SINK_BODY_SCHEMA).set("ticker", "CDAP").set("num", 13).set("price", 212.36).build()
-    );
+
     DataSetManager<Table> inputManager = getDataset(inputDatasetName);
-    MockSource.writeInput(inputManager, inputRecords);
+    MockSource.writeInput(inputManager, ALL_SINK_DATATYPES_RECORDS);
 
     WorkflowManager workflowManager = appManager.getWorkflowManager(SmartWorkflow.NAME);
     workflowManager.start();
     workflowManager.waitForRuns(ProgramRunStatus.COMPLETED, 1, 5, TimeUnit.MINUTES);
 
-    verifyMongoSinkData(MONGO_SINK_COLLECTIONS);
-    verifyMongoSinkData(secondCollectionName);
+    verifyMongoSinkData(MONGO_SINK_COLLECTIONS, ALL_SINK_DATATYPES_RECORDS,
+                        Arrays.asList(COMPARE_COMMON, COMPARE_SINK_DATA_TYPES));
+    verifyMongoSinkData(secondCollectionName, ALL_SINK_DATATYPES_RECORDS,
+                        Arrays.asList(COMPARE_COMMON, COMPARE_SINK_DATA_TYPES));
   }
 
   @Test
@@ -304,8 +411,8 @@ public class MongoDBTest extends HydratorTestBase {
       BatchSource.PLUGIN_TYPE,
       new ImmutableMap.Builder<String, String>()
         .putAll(getCommonPluginProperties())
-        .put(MongoDBConstants.COLLECTION, MONGO_SOURCE_COLLECTIONS)
-        .put(MongoDBConstants.SCHEMA, SOURCE_BODY_SCHEMA.toString())
+        .put(MongoDBConstants.COLLECTION, SOURCE_COLLECTIONS)
+        .put(MongoDBConstants.SCHEMA, SCHEMA.toString())
         .put(Constants.Reference.REFERENCE_NAME, "MongoMongoTest").build(),
       null));
 
@@ -313,9 +420,9 @@ public class MongoDBTest extends HydratorTestBase {
       "MongoDB",
       BatchSink.PLUGIN_TYPE,
       new ImmutableMap.Builder<String, String>()
-        .put(MongoDBBatchSink.Properties.CONNECTION_STRING,
-             String.format("mongodb://localhost:%d/%s.%s",
-                           mongoPort, MONGO_DB, MONGO_SINK_COLLECTIONS))
+        .putAll(getCommonPluginProperties())
+        .put(MongoDBConstants.ID_FIELD, "_id")
+        .put(MongoDBConstants.COLLECTION, MONGO_SINK_COLLECTIONS)
         .put(Constants.Reference.REFERENCE_NAME, "MongoToMongoTest").build(),
       null));
     ETLBatchConfig etlConfig = ETLBatchConfig.builder("* * * * *")
@@ -332,67 +439,7 @@ public class MongoDBTest extends HydratorTestBase {
     workflowManager.start();
     workflowManager.waitForRuns(ProgramRunStatus.COMPLETED, 1, 5, TimeUnit.MINUTES);
 
-    MongoDatabase mongoDatabase = mongoClient.getDatabase(MONGO_DB);
-    MongoCollection<Document> documents = mongoDatabase.getCollection(MONGO_SINK_COLLECTIONS);
-    Assert.assertEquals(2, documents.count());
-    Iterable<Document> docs = documents.find(new BasicDBObject("ticker", "AAPL"));
-    Assert.assertTrue(docs.iterator().hasNext());
-    for (Document document : docs) {
-      Assert.assertEquals(10, (int) document.getInteger("num"));
-      Assert.assertEquals(23.23, document.getDouble("price"), 0.0001);
-      Assert.assertNotNull(document.get("agents"));
-    }
-
-    docs = documents.find(new BasicDBObject("ticker", "ORCL"));
-    Assert.assertTrue(docs.iterator().hasNext());
-    for (Document document : docs) {
-      Assert.assertEquals(12, (int) document.getInteger("num"));
-      Assert.assertEquals(10.10, document.getDouble("price"), 0.0001);
-      Assert.assertNotNull(document.get("agents"));
-    }
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Test
-  public void testMongoDBSource() throws Exception {
-    ETLStage source = new ETLStage("MongoDB", new ETLPlugin(
-      "MongoDB",
-      BatchSource.PLUGIN_TYPE,
-      new ImmutableMap.Builder<String, String>()
-        .putAll(getCommonPluginProperties())
-        .put(MongoDBConstants.COLLECTION, MONGO_SOURCE_COLLECTIONS)
-        .put(MongoDBConstants.SCHEMA, SOURCE_BODY_SCHEMA.toString())
-        .put(Constants.Reference.REFERENCE_NAME, "SimpleMongoTest").build(),
-      null));
-    String outputDatasetName = "output-batchsourcetest";
-    ETLStage sink = new ETLStage("sink", MockSink.getPlugin(outputDatasetName));
-    ETLBatchConfig etlConfig = ETLBatchConfig.builder("* * * * *")
-      .addStage(source)
-      .addStage(sink)
-      .addConnection(source.getName(), sink.getName())
-      .build();
-
-    AppRequest<ETLBatchConfig> appRequest = new AppRequest<>(ETLBATCH_ARTIFACT, etlConfig);
-    ApplicationId appId = NamespaceId.DEFAULT.app("MongoSourceTest");
-    ApplicationManager appManager = deployApplication(appId, appRequest);
-
-    WorkflowManager workflowManager = appManager.getWorkflowManager(SmartWorkflow.NAME);
-    workflowManager.start();
-    workflowManager.waitForRuns(ProgramRunStatus.COMPLETED, 1, 5, TimeUnit.MINUTES);
-
-    DataSetManager<Table> outputManager = getDataset(outputDatasetName);
-    List<StructuredRecord> outputRecords = MockSink.readOutput(outputManager);
-    Assert.assertEquals(2, outputRecords.size());
-    String ticker = outputRecords.get(0).get("ticker");
-    StructuredRecord row1 = "AAPL".equals(ticker) ? outputRecords.get(0) : outputRecords.get(1);
-    StructuredRecord row2 = "AAPL".equals(ticker) ? outputRecords.get(1) : outputRecords.get(0);
-
-    Assert.assertEquals("AAPL", row1.get("ticker"));
-    Assert.assertEquals(10, (int) row1.get("num"));
-    Assert.assertEquals(23.23, (double) row1.get("price"), 0.00001);
-    Assert.assertEquals("ORCL", row2.get("ticker"));
-    Assert.assertEquals(12, (int) row2.get("num"));
-    Assert.assertEquals(10.10, (double) row2.get("price"), 0.00001);
+    verifyMongoSinkData(MONGO_SINK_COLLECTIONS, TEST_RECORDS, Collections.singletonList(COMPARE_COMMON));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -403,8 +450,8 @@ public class MongoDBTest extends HydratorTestBase {
       BatchSource.PLUGIN_TYPE,
       new ImmutableMap.Builder<String, String>()
         .putAll(getCommonPluginProperties())
-        .put(MongoDBConstants.COLLECTION, MONGO_SUPPORTED_DATA_TYPES_COLLECTIONS)
-        .put(MongoDBConstants.SCHEMA, SUPPORTED_DATA_TYPES_SCHEMA.toString())
+        .put(MongoDBConstants.COLLECTION, SOURCE_COLLECTIONS)
+        .put(MongoDBConstants.SCHEMA, SCHEMA.toString())
         .put(Constants.Reference.REFERENCE_NAME, "AllDataTypesMongoTest").build(),
       null));
     String outputDatasetName = "all-data-types-output-batchsourcetest";
@@ -426,7 +473,7 @@ public class MongoDBTest extends HydratorTestBase {
     DataSetManager<Table> outputManager = getDataset(outputDatasetName);
     List<StructuredRecord> outputRecords = MockSink.readOutput(outputManager);
     Assert.assertEquals(2, outputRecords.size());
-    for (BsonDocument expected : SUPPORTED_DATA_TYPES_TEST_DOCUMENTS) {
+    for (BsonDocument expected : TEST_DOCUMENTS) {
       Optional<StructuredRecord> actualOptional = outputRecords.stream()
         .filter(r -> expected.getObjectId("_id").getValue().toHexString().equals(r.get("_id")))
         .findAny();
@@ -465,22 +512,19 @@ public class MongoDBTest extends HydratorTestBase {
     }
   }
 
-  private void verifyMongoSinkData(String collectionName) throws Exception {
+  private void verifyMongoSinkData(String collectionName, List<StructuredRecord> expectedRecords,
+                                   List<BiConsumer<StructuredRecord, BsonDocument>> testActions) throws Exception {
     MongoDatabase mongoDatabase = mongoClient.getDatabase(MONGO_DB);
-    MongoCollection<Document> documents = mongoDatabase.getCollection(collectionName);
-    Assert.assertEquals(2, documents.count());
-    Iterable<Document> docs = documents.find(new BasicDBObject("ticker", "AAPL"));
-    Assert.assertTrue(docs.iterator().hasNext());
-    for (Document document : docs) {
-      Assert.assertEquals(10, (int) document.getInteger("num"));
-      Assert.assertEquals(500.32, document.getDouble("price"), 0.0001);
-    }
+    MongoCollection<BsonDocument> documents = mongoDatabase.getCollection(collectionName, BsonDocument.class);
+    Assert.assertEquals(expectedRecords.size(), documents.count());
 
-    docs = documents.find(new BasicDBObject("ticker", "CDAP"));
-    Assert.assertTrue(docs.iterator().hasNext());
-    for (Document document : docs) {
-      Assert.assertEquals(13, (int) document.getInteger("num"));
-      Assert.assertEquals(212.36, document.getDouble("price"), 0.0001);
+    for (StructuredRecord expected : expectedRecords) {
+      BsonObjectId expectedId = new BsonObjectId(new ObjectId(expected.<String>get("_id")));
+      Iterator<BsonDocument> actualIterator = documents.find(new BsonDocument("_id", expectedId)).iterator();
+      Assert.assertTrue(actualIterator.hasNext());
+      BsonDocument actual = actualIterator.next();
+      // Perform supplied test actions
+      testActions.forEach(test -> test.accept(expected, actual));
     }
   }
 

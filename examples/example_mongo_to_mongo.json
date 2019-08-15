@@ -1,0 +1,98 @@
+{
+    "artifact": {
+        "name": "cdap-data-pipeline",
+        "version": "6.1.0-SNAPSHOT",
+        "scope": "SYSTEM",
+        "label": "Data Pipeline - Batch"
+    },
+    "description": "Data Pipeline Application",
+    "name": "mongo_to_mongo",
+    "config": {
+        "resources": {
+            "memoryMB": 1024,
+            "virtualCores": 1
+        },
+        "driverResources": {
+            "memoryMB": 1024,
+            "virtualCores": 1
+        },
+        "connections": [
+            {
+                "from": "MongoDBSource",
+                "to": "MongoDBSink"
+            }
+        ],
+        "comments": [],
+        "postActions": [],
+        "properties": {},
+        "processTimingEnabled": true,
+        "stageLoggingEnabled": true,
+        "stages": [
+            {
+                "name": "MongoDBSource",
+                "plugin": {
+                    "name": "MongoDB",
+                    "type": "batchsource",
+                    "label": "MongoDBSource",
+                    "artifact": {
+                        "name": "mongodb-plugins",
+                        "version": "1.3.0-SNAPSHOT",
+                        "scope": "USER"
+                    },
+                    "properties": {
+                        "host": "localhost",
+                        "port": "27017",
+                        "on-error": "fail-pipeline",
+                        "schema": "{\"type\":\"record\",\"name\":\"etlSchemaBody\",\"fields\":[{\"name\":\"_id\",\"type\":\"bytes\"},{\"name\":\"string\",\"type\":\"string\"},{\"name\":\"int32\",\"type\":\"int\"},{\"name\":\"double\",\"type\":\"double\"},{\"name\":\"array\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"object\",\"type\":{\"type\":\"record\",\"name\":\"a57542a5c977c4dccb02186d4219c69a4\",\"fields\":[{\"name\":\"inner_field\",\"type\":\"string\"}]}},{\"name\":\"binary\",\"type\":\"bytes\"},{\"name\":\"undefined\",\"type\":[\"string\",\"null\"]},{\"name\":\"boolean\",\"type\":\"boolean\"},{\"name\":\"date\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-micros\"}},{\"name\":\"null\",\"type\":[\"string\",\"null\"]},{\"name\":\"symbol\",\"type\":\"string\"},{\"name\":\"long\",\"type\":\"long\"}]}",
+                        "referenceName": "MongoDBSource",
+                        "database": "${source_database_name}",
+                        "collection": "${source_collection_name}"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"type\":\"record\",\"name\":\"etlSchemaBody\",\"fields\":[{\"name\":\"_id\",\"type\":\"bytes\"},{\"name\":\"string\",\"type\":\"string\"},{\"name\":\"int32\",\"type\":\"int\"},{\"name\":\"double\",\"type\":\"double\"},{\"name\":\"array\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"object\",\"type\":{\"type\":\"record\",\"name\":\"a57542a5c977c4dccb02186d4219c69a4\",\"fields\":[{\"name\":\"inner_field\",\"type\":\"string\"}]}},{\"name\":\"binary\",\"type\":\"bytes\"},{\"name\":\"undefined\",\"type\":[\"string\",\"null\"]},{\"name\":\"boolean\",\"type\":\"boolean\"},{\"name\":\"date\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-micros\"}},{\"name\":\"null\",\"type\":[\"string\",\"null\"]},{\"name\":\"symbol\",\"type\":\"string\"},{\"name\":\"long\",\"type\":\"long\"}]}"
+                    }
+                ]
+            },
+            {
+                "name": "MongoDBSink",
+                "plugin": {
+                    "name": "MongoDB",
+                    "type": "batchsink",
+                    "label": "MongoDBSink",
+                    "artifact": {
+                        "name": "mongodb-plugins",
+                        "version": "1.3.0-SNAPSHOT",
+                        "scope": "USER"
+                    },
+                    "properties": {
+                        "host": "localhost",
+                        "port": "27017",
+                        "idField": "_id",
+                        "collection": "${sink_collection_name}",
+                        "database": "${sink_database_name}",
+                        "referenceName": "MongoDBSink"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": ""
+                    }
+                ],
+                "inputSchema": [
+                    {
+                        "name": "MongoDBSource",
+                        "schema": "{\"type\":\"record\",\"name\":\"etlSchemaBody\",\"fields\":[{\"name\":\"_id\",\"type\":\"bytes\"},{\"name\":\"string\",\"type\":\"string\"},{\"name\":\"int32\",\"type\":\"int\"},{\"name\":\"double\",\"type\":\"double\"},{\"name\":\"array\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"object\",\"type\":{\"type\":\"record\",\"name\":\"a57542a5c977c4dccb02186d4219c69a4\",\"fields\":[{\"name\":\"inner_field\",\"type\":\"string\"},{\"name\":\"binary\",\"type\":\"bytes\"}]}}]}"
+                    }
+                ]
+            }
+        ],
+        "schedule": "0 * * * *",
+        "engine": "mapreduce",
+        "numOfRecordsPreview": 100,
+        "maxConcurrentRuns": 1
+    }
+}

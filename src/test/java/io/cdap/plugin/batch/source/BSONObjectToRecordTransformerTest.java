@@ -24,6 +24,7 @@ import io.cdap.cdap.api.data.schema.Schema;
 import org.bson.BSONObject;
 import org.bson.types.BasicBSONList;
 import org.bson.types.Decimal128;
+import org.bson.types.ObjectId;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -332,5 +333,26 @@ public class BSONObjectToRecordTransformerTest {
 
     BSONObjectToRecordTransformer transformer = new BSONObjectToRecordTransformer(schema);
     transformer.transform(bsonObject);
+  }
+
+  @Test
+  public void testTransformBytesId() {
+    Schema schema = Schema.recordOf("schema", Schema.Field.of("_id", Schema.of(Schema.Type.BYTES)));
+
+    ObjectId expectedId = new ObjectId("5d55315ce63eaf3886d57760");
+    BSONObject bsonObject = BasicDBObjectBuilder.start()
+      .add("_id", expectedId)
+      .get();
+
+    BSONObjectToRecordTransformer transformer = new BSONObjectToRecordTransformer(schema);
+    StructuredRecord transformed = transformer.transform(bsonObject);
+    Assert.assertNotNull(transformed);
+
+    Object transformedIdValue = transformed.get("_id");
+    Assert.assertNotNull(transformedIdValue);
+    ObjectId transformedId = transformedIdValue instanceof ByteBuffer ? new ObjectId((ByteBuffer) transformedIdValue)
+      : new ObjectId((byte[]) transformedIdValue);
+
+    Assert.assertEquals(expectedId, transformedId);
   }
 }
