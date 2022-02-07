@@ -11,7 +11,7 @@ Configuration
 -------------
 **Reference Name:** Name used to uniquely identify this source for lineage, annotating metadata, etc.
 
-**Host:** Host that MongoDB is running on.
+**Host:** Host that MongoDB is running on. Enter the hostname only. The connection string is constructed by the plugin.
 
 **Port:** Port that MongoDB is listening to.
 
