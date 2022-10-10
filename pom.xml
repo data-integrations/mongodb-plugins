@@ -43,7 +43,7 @@
     <cdap.version>6.8.0-SNAPSHOT</cdap.version>
     <cdap.plugin.version>2.3.0-SNAPSHOT</cdap.plugin.version>
     <guava.version>13.0.1</guava.version>
-    <hadoop.version>2.3.0</hadoop.version>
+    <hadoop.version>3.2.3</hadoop.version>
     <junit.version>4.11</junit.version>
   </properties>
 
