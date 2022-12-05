@@ -99,6 +99,8 @@ public class MongoDBBatchSource extends ReferenceBatchSource<Object, BSONObject,
       MongoConfigUtil.setAuthURI(conf, config.authConnectionString);
     }
 
+    MongoConfigUtil.setRangeQueryEnabled(conf, true);
+
     emitLineage(context);
     context.setInput(Input.of(config.getReferenceName(),
                               new SourceInputFormatProvider(MongoConfigUtil.getInputFormat(conf), conf)));
