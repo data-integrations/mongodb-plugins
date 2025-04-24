@@ -62,6 +62,22 @@
           "name": "password"
         },
         {
+          "widget-type": "toggle",
+          "label": "Connect Using SRV String",
+          "name": "connectUsingSRVString",
+          "widget-attributes": {
+            "on": {
+              "value": "true",
+              "label": "True"
+            },
+            "off": {
+              "value": "false",
+              "label": "False"
+            },
+            "default": "false"
+          }
+        },
+        {
           "widget-type": "textbox",
           "label": "Authentication Connection String",
           "name": "authConnectionString",

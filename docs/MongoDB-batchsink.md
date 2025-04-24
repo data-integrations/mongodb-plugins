@@ -26,6 +26,9 @@ automatically generated.
 
 **Password:** Password to use to connect to the specified database.
 
+**Connect Using SRV String:** Toggle to determine whether to use an SRV connection string for MongoDB. It can be
+enabled if the MongoDB deployment supports SRV DNS records for connection resolution.
+
 **Connection Arguments:** A list of arbitrary string key/value pairs as connection arguments. See
 [Connection String Options] for a full description of these arguments.
 

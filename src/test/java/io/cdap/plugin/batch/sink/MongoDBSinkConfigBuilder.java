@@ -49,6 +49,6 @@ public class MongoDBSinkConfigBuilder extends MongoDBConfigBuilder<MongoDBSinkCo
 
   public MongoDBBatchSink.MongoDBSinkConfig build() {
     return new MongoDBBatchSink.MongoDBSinkConfig(referenceName, host, port, database, collection, user, password,
-                                                  connectionArguments, idField);
+                                                  connectUsingSRVString, connectionArguments, idField);
   }
 }

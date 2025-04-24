@@ -50,7 +50,8 @@ public class MongoDBConfig extends PluginConfig {
   @Name(MongoDBConstants.PORT)
   @Description("Port that MongoDB is listening to.")
   @Macro
-  private int port;
+  @Nullable
+  private Integer port;
 
   @Name(MongoDBConstants.DATABASE)
   @Description("MongoDB database name.")
@@ -76,6 +77,13 @@ public class MongoDBConfig extends PluginConfig {
   @Nullable
   private String password;
 
+  @Name(MongoDBConstants.CONNECT_USING_SRV_STRING)
+  @Description("Toggle to determine whether to use an SRV connection string for MongoDB. It can be " +
+    "enabled if the MongoDB deployment supports SRV DNS records for connection resolution.")
+  @Macro
+  @Nullable
+  private boolean connectUsingSRVString;
+
   @Name(MongoDBConstants.CONNECTION_ARGUMENTS)
   @Description("A list of arbitrary string key/value pairs as connection arguments.")
   @Macro
@@ -83,7 +91,7 @@ public class MongoDBConfig extends PluginConfig {
   private String connectionArguments;
 
   public MongoDBConfig(String referenceName, String host, int port, String database, String collection, String user,
-                       String password, String connectionArguments) {
+                       String password, boolean connectUsingSRVString, String connectionArguments) {
     this.referenceName = referenceName;
     this.host = host;
     this.port = port;
@@ -91,6 +99,7 @@ public class MongoDBConfig extends PluginConfig {
     this.collection = collection;
     this.user = user;
     this.password = password;
+    this.connectUsingSRVString = connectUsingSRVString;
     this.connectionArguments = connectionArguments;
   }
 
@@ -102,7 +111,8 @@ public class MongoDBConfig extends PluginConfig {
     return host;
   }
 
-  public int getPort() {
+  @Nullable
+  public Integer getPort() {
     return port;
   }
 
@@ -122,6 +132,10 @@ public class MongoDBConfig extends PluginConfig {
   @Nullable
   public String getPassword() {
     return password;
+  }
+
+  public boolean connectUsingSRVString() {
+    return connectUsingSRVString;
   }
 
   @Nullable
@@ -146,7 +160,8 @@ public class MongoDBConfig extends PluginConfig {
     if (!containsMacro(MongoDBConstants.HOST) && Strings.isNullOrEmpty(host)) {
       throw new InvalidConfigPropertyException("Host must be specified", MongoDBConstants.HOST);
     }
-    if (!containsMacro(MongoDBConstants.PORT)) {
+    if ((!containsMacro(MongoDBConstants.CONNECT_USING_SRV_STRING) && !connectUsingSRVString) &&
+      !containsMacro(MongoDBConstants.PORT)) {
       if (port < 1) {
         throw new InvalidConfigPropertyException("Port number must be greater than 0", MongoDBConstants.PORT);
       }
@@ -161,24 +176,32 @@ public class MongoDBConfig extends PluginConfig {
 
   /**
    * Constructs a connection string such as: "mongodb://admin:password@localhost:27017/admin.analytics?key=value;"
-   * using host, port, username, password, database, collection and optional connection properties. In the case when
-   * username or password is not provided the connection string will not contain credentials:
+   * using host, port, username, password, database, collection and optional connection properties.
+   * If SRV is enabled, the connection string will use the "mongodb+srv://" protocol instead of "mongodb://".
+   * In the case when username or password is not provided, the connection string will not contain credentials:
    * "mongodb://localhost:27017/admin.analytics?key=value;"
+   * When SRV is not used, the port will be included in the connection string.
    *
    * @return connection string.
    */
   public String getConnectionString() {
-    StringBuilder connectionStringBuilder = new StringBuilder("mongodb://");
+    StringBuilder connectionStringBuilder = new StringBuilder();
+    if (connectUsingSRVString()) {
+      connectionStringBuilder.append("mongodb+srv://");
+    } else {
+      connectionStringBuilder.append("mongodb://");
+    }
     if (!Strings.isNullOrEmpty(user) || !Strings.isNullOrEmpty(password)) {
       connectionStringBuilder.append(user).append(":").append(password).append("@");
     }
-    connectionStringBuilder.append(host).append(":").append(port).append("/")
-      .append(database).append(".").append(collection);
-
+    connectionStringBuilder.append(host);
+    if (!connectUsingSRVString()) {
+      connectionStringBuilder.append(":").append(port);
+    }
+    connectionStringBuilder.append("/").append(database).append(".").append(collection);
     if (!Strings.isNullOrEmpty(connectionArguments)) {
       connectionStringBuilder.append("?").append(connectionArguments);
     }
-
     return connectionStringBuilder.toString();
   }
 

@@ -36,6 +36,7 @@ public class MongoDBConfigTest {
     .setCollection("analytics")
     .setUser("admin")
     .setPassword("password")
+    .setConnectUsingSRVString(false)
     .setConnectionArguments("key=value;")
     .build();
 
@@ -43,6 +44,16 @@ public class MongoDBConfigTest {
   public void testConfigConnectionString() {
     Assert.assertEquals("mongodb://admin:password@localhost:27017/admin.analytics?key=value;",
                         VALID_CONFIG.getConnectionString());
+  }
+
+  @Test
+  public void testConfigConnectionStringWithSRV() {
+    String connectionString = MongoDBConfigBuilder.builder(VALID_CONFIG)
+      .setConnectUsingSRVString(true)
+      .build()
+      .getConnectionString();
+
+    Assert.assertEquals("mongodb+srv://admin:password@localhost/admin.analytics?key=value;", connectionString);
   }
 
   @Test
@@ -54,6 +65,18 @@ public class MongoDBConfigTest {
       .getConnectionString();
 
     Assert.assertEquals("mongodb://localhost:27017/admin.analytics?key=value;", connectionString);
+  }
+
+  @Test
+  public void testConfigConnectionStringWithSRVNoCreds() {
+    String connectionString = MongoDBConfigBuilder.builder(VALID_CONFIG)
+      .setConnectUsingSRVString(true)
+      .setUser(null)
+      .setPassword(null)
+      .build()
+      .getConnectionString();
+
+    Assert.assertEquals("mongodb+srv://localhost/admin.analytics?key=value;", connectionString);
   }
 
   @Test

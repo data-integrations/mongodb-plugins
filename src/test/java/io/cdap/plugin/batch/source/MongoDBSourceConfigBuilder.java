@@ -70,7 +70,7 @@ public class MongoDBSourceConfigBuilder extends MongoDBConfigBuilder<MongoDBSour
 
   public MongoDBBatchSource.MongoDBSourceConfig build() {
     return new MongoDBBatchSource.MongoDBSourceConfig(referenceName, host, port, database, collection, user, password,
-                                                      connectionArguments, schema, inputQuery, onError,
-                                                      authConnectionString);
+                                                      connectUsingSRVString, connectionArguments, schema, inputQuery,
+                                                      onError, authConnectionString);
   }
 }

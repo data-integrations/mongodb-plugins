@@ -28,6 +28,9 @@ and use the [MongoDB extended JSON format] to represent non-native JSON data typ
 
 **Password:** Password to use to connect to the specified database.
 
+**Connect Using SRV String:** Toggle to determine whether to use an SRV connection string for MongoDB. It can be
+enabled if the MongoDB deployment supports SRV DNS records for connection resolution.
+
 **Authentication Connection String:** Optional MongoDB connection string to connect to the 'config' database of a
 sharded cluster. It can be omitted if username and password do not differ from the previously provided ones or if
 'config' database does not require authentication.
