@@ -82,7 +82,7 @@ public class MongoDBConfig extends PluginConfig {
     "enabled if the MongoDB deployment supports SRV DNS records for connection resolution.")
   @Macro
   @Nullable
-  private boolean connectUsingSRVString;
+  private Boolean connectUsingSRVString;
 
   @Name(MongoDBConstants.CONNECTION_ARGUMENTS)
   @Description("A list of arbitrary string key/value pairs as connection arguments.")
