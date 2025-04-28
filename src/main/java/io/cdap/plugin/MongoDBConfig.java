@@ -160,8 +160,9 @@ public class MongoDBConfig extends PluginConfig {
     if (!containsMacro(MongoDBConstants.HOST) && Strings.isNullOrEmpty(host)) {
       throw new InvalidConfigPropertyException("Host must be specified", MongoDBConstants.HOST);
     }
-    if ((!containsMacro(MongoDBConstants.CONNECT_USING_SRV_STRING) && !connectUsingSRVString) &&
-      !containsMacro(MongoDBConstants.PORT)) {
+    if (!containsMacro(MongoDBConstants.PORT) && port != null && !containsMacro(
+        MongoDBConstants.CONNECT_USING_SRV_STRING) && connectUsingSRVString != null && !connectUsingSRVString) {
+      // Port is not required when SRV is used
       if (port < 1) {
         throw new InvalidConfigPropertyException("Port number must be greater than 0", MongoDBConstants.PORT);
       }
