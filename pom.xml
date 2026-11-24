@@ -40,10 +40,10 @@
     <surefire.redirectTestOutputToFile>true</surefire.redirectTestOutputToFile>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- version properties -->
-    <cdap.version>6.8.0</cdap.version>
+    <cdap.version>6.12.0-SNAPSHOT</cdap.version>
     <cdap.plugin.version>2.3.4</cdap.plugin.version>
-    <guava.version>13.0.1</guava.version>
-    <hadoop.version>2.3.0</hadoop.version>
+    <guava.version>33.8.0-jre</guava.version>
+    <hadoop.version>3.3.6</hadoop.version>
     <junit.version>4.11</junit.version>
   </properties>
 
@@ -56,6 +56,11 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${guava.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-mapreduce-client-core</artifactId>
@@ -202,7 +207,6 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>${guava.version}</version>
     </dependency>
     <dependency>
       <groupId>commons-logging</groupId>
@@ -398,7 +402,7 @@
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
-        <version>3.3.0</version>
+        <version>5.1.9</version>
         <extensions>true</extensions>
         <configuration>
           <instructions>
