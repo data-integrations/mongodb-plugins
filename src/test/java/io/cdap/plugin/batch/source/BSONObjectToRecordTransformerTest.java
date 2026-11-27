@@ -34,6 +34,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
@@ -291,7 +292,7 @@ public class BSONObjectToRecordTransformerTest {
                                     Schema.Field.of("timestamp_micros", Schema.of(Schema.LogicalType.TIMESTAMP_MICROS))
     );
 
-    ZonedDateTime dateTime = ZonedDateTime.now(ZoneOffset.UTC);
+    ZonedDateTime dateTime = ZonedDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS);
     StructuredRecord expected = StructuredRecord.builder(schema)
       .setDecimal("decimal_6_4", new BigDecimal("10.1234"))
       .setDecimal("decimal_34_4", new BigDecimal("10.1234"))
